@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oxm="http://www.springframework.org/schema/oxm"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/oxm http://www.springframework.org/schema/oxm/spring-oxm-3.0.xsd
+          http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.0.xsd
+         http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-3.0.xsd">
+
+	<bean id="userTransactionService" class="com.atomikos.icatch.config.UserTransactionServiceImp"
+		init-method="init" destroy-method="shutdownForce">
+		<constructor-arg>
+			<props>
+				<prop key="com.atomikos.icatch.service">com.atomikos.icatch.standalone.UserTransactionServiceFactory
+				</prop>
+			</props>
+		</constructor-arg>
+	</bean>
+
+	<bean id="atomikosTransactionManager" class="com.atomikos.icatch.jta.UserTransactionManager"
+		init-method="init" destroy-method="close" depends-on="userTransactionService">
+		<property name="forceShutdown" value="false" />
+	</bean>
+
+	<bean id="atomikosUserTransaction" class="com.atomikos.icatch.jta.UserTransactionImp"
+		depends-on="userTransactionService">
+		<property name="transactionTimeout" value="300" />
+	</bean>
+
+	<bean id="jtaTransactionManager"
+		class="org.springframework.transaction.jta.JtaTransactionManager"
+		depends-on="userTransactionService">
+		<property name="transactionManager" ref="atomikosTransactionManager" />
+		<property name="userTransaction" ref="atomikosUserTransaction" />
+	</bean>
+
+	<tx:annotation-driven transaction-manager="jtaTransactionManager" />
+
+
+	<jdbc:embedded-database id="dataSource">
+		<jdbc:script location="classpath:createDB.sql" />
+	</jdbc:embedded-database>
+
+	<bean id="sessionFactory"
+		class="org.springframework.orm.hibernate3.LocalSessionFactoryBean">
+		<property name="dataSource">
+			<ref bean="dataSource" />
+		</property>
+		<property name="mappingResources">
+			<list>
+				<value>Order.hbm.xml</value>
+			</list>
+		</property>
+		<property name="hibernateProperties">
+			<props>
+				<prop key="hibernate.dialect">org.hibernate.dialect.MySQLDialect</prop>
+				<prop key="hibernate.show_sql">true</prop>
+				<prop key="hibernate.max_fetch_depth">2</prop>
+				<prop key="hibernate.transaction.factory_class">com.atomikos.icatch.jta.hibernate3.AtomikosJTATransactionFactory
+				</prop>
+				<prop key="hibernate.transaction.manager_lookup_class">com.atomikos.icatch.jta.hibernate3.TransactionManagerLookup
+				</prop>
+			</props>
+		</property>
+	</bean>
+
+	<bean id="jmsXaConnectionFactory" class="org.apache.activemq.ActiveMQXAConnectionFactory">
+		<property name="brokerURL" value="tcp://localhost:61616" />
+	</bean>
+
+	<bean id="amqConnectionFactory" class="com.atomikos.jms.AtomikosConnectionFactoryBean"
+		init-method="init">
+		<property name="uniqueResourceName" value="XAactiveMQ" />
+		<property name="xaConnectionFactory" ref="jmsXaConnectionFactory" />
+		<property name="poolSize" value="5" />
+	</bean>
+
+
+	<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+		<property name="connectionFactory" ref="amqConnectionFactory" />
+		<property name="receiveTimeout" value="2000" />
+		<property name="defaultDestination" ref="orderQueue" />
+		<property name="sessionTransacted" value="false" />
+		<property name="messageConverter" ref="oxmMessageConverter" />
+	</bean>
+
+	<bean id="orderQueue" class="org.apache.activemq.command.ActiveMQQueue">
+		<constructor-arg value="ORDER.QUEUE" />
+	</bean>
+
+
+	<bean id="oxmMessageConverter"
+		class="org.springframework.jms.support.converter.MarshallingMessageConverter">
+		<property name="marshaller" ref="marshaller" />
+		<property name="unmarshaller" ref="marshaller" />
+	</bean>
+
+	<oxm:jaxb2-marshaller id="marshaller">
+		<oxm:class-to-be-bound name="davenkin.Order" />
+	</oxm:jaxb2-marshaller>
+
+	<bean id="orderService" class="davenkin.DefaultOrderService">
+		<property name="jmsTemplate" ref="jmsTemplate" />
+		<property name="sessionFactory" ref="sessionFactory" />
+	</bean>
+
+</beans>

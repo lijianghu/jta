@@ -1,0 +1,46 @@
+apply plugin: 'idea'
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'eclipse-wtp'
+
+sourceCompatibility = 1.6
+group = 'davenkin'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    all*.exclude group: 'javax.jms', module: 'jms'
+    all*.exclude group: 'com.sun.jdmk', module: 'jmxtools'
+    all*.exclude group: 'com.sun.jmx', module: 'jmxri'
+    all*.exclude group: 'javax.transaction', module: 'jta'
+    all*.exclude group: 'org.apache.activemq', module: 'activemq-amqp'
+
+}
+
+dependencies {
+    compile 'org.slf4j:slf4j-api:1.7.2'
+    compile "org.springframework:spring-beans:3.2.0.RELEASE"
+    compile "org.springframework:spring-context:3.2.0.RELEASE"
+    compile "org.springframework:spring-context-support:3.2.0.RELEASE"
+    compile "org.springframework:spring-core:3.2.0.RELEASE"
+    compile "org.springframework:spring-jdbc:3.2.0.RELEASE"
+    compile "org.springframework:spring-orm:3.2.0.RELEASE"
+    compile "org.springframework:spring-oxm:3.2.0.RELEASE"
+    compile "org.springframework:spring-jms:3.2.0.RELEASE"
+    compile "javax.xml.bind:jaxb-api:2.2.2"
+    compile 'org.hsqldb:hsqldb:2.2.9'
+    compile 'org.apache.activemq:activemq-all:5.8.0'
+    compile 'mysql:mysql-connector-java:5.1.23'
+    compile 'com.atomikos:transactions-essentials-all:3.6.4'
+    testCompile "org.springframework:spring-test:3.2.0.RELEASE"
+    testCompile 'junit:junit:4.8.2'
+    testCompile 'easymock:easymock:2.0'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '1.0-milestone-9'
+    jarFile = 'wrapper/wrapper.jar'
+}
